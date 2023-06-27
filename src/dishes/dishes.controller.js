@@ -37,6 +37,22 @@ const validator = (field) => {
     }
 }
 
+const validateId = (req, res, next) => {
+    const { dishesId } = req.params;
+    const { id } = req.body.data;
+
+    if (!id || id === dishesId) {
+        next();
+    }else{
+        next({
+          status: 400,
+          message: `Dish id does not match route id. Dish: ${id}, Route: ${dishesId}`,
+        });
+    }
+
+    next();
+}
+
 const validatePriceIsNumeric = (req, res, next) => {
     let {price} = req.body.data
     if(typeof price === "number" && price > 0){
@@ -59,16 +75,14 @@ const read = (req, res, next) => {
 
 const update = (req, res, next) => {
     const {name, description, price, image_url} = req.body.data
-    const {index, dish} = res.locals
-    const updatedDish = {
-        ...dish,
-        name,
-        description,
-        price,
-        image_url
-    }
-    dishes[index] = updatedDish
-    res.send({ data: updatedDish })
+    const {dish} = res.locals
+   
+    dish.name = name;
+    dish.description = description;
+    dish.price = price;
+    dish.image_url = image_url;
+    
+    res.send({ data: dish })
 }
 
 const create = (req, res, next) => {
@@ -94,12 +108,12 @@ module.exports = {
     read: [validateDishExists, read],
     update: [
         validateDishExists, 
-        validator("id"), 
         validator("name"), 
         validator("description"),
         validator("price"),
         validator("image_url"),
         validatePriceIsNumeric,
+        validateId, 
         update
     ],
     create: [
