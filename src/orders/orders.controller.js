@@ -2,6 +2,7 @@ const path = require("path");
 
 // Use the existing order data
 const orders = require(path.resolve("src/data/orders-data"));
+const dishes = require(path.resolve("src/data/dishes-data"));
 
 // Use this function to assigh ID's when necessary
 const nextId = require("../utils/nextId");
@@ -38,15 +39,16 @@ const validator = (field) => {
 }
 
 const validateDishQuantityIsAnInteger = (req, res, next) => {
-    let {quantity} = req.body.data
-    if(typeof quantity === "number" && quantity > 0){
-        next()
-    }else{
-        next({
-            status: 400,
-            message: "quantity must be an integar greater than 0"
-        })
-    }
+    dishes.forEach((dish) => {
+        if(Number.isInteger(dish.quantity) || dish.quantity <= 0){
+            next()
+        }else{
+            next({
+                status: 400,
+                message: `dish ${dish.id} must have a quantity that is an integer greater than 0`
+            })
+        }
+    })
 }
 
 const create = (req, res, next) => {
@@ -87,6 +89,19 @@ const read = (req, res, next) => {
     res.send({ data: res.locals.order })
 }
 
+const destroy = (req, res, next) => {
+    const {index, order} = res.locals
+    if(order.status !== "pending"){
+        next({
+            status: 400,
+            message: "The status is pending, you cannot delete this"
+        })
+    }else{
+        orders.splice(index, 1)
+        res.status(204).send()
+    }
+}
+
 
 module.exports = {
     list,
@@ -107,5 +122,6 @@ module.exports = {
         validator("dishes"),
         validateDishQuantityIsAnInteger,
         update
-    ]
+    ],
+    delete: [validateOrderExists, destroy]
 }
