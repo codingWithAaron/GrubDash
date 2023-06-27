@@ -2,7 +2,6 @@ const path = require("path");
 
 // Use the existing order data
 const orders = require(path.resolve("src/data/orders-data"));
-const dishes = require(path.resolve("src/data/dishes-data"));
 
 // Use this function to assigh ID's when necessary
 const nextId = require("../utils/nextId");
@@ -39,27 +38,67 @@ const validator = (field) => {
 }
 
 const validateDishQuantityIsAnInteger = (req, res, next) => {
-    dishes.forEach((dish) => {
-        if(Number.isInteger(dish.quantity) || dish.quantity <= 0){
-            next()
-        }else{
+    const { data: { dishes } = {} } = req.body;
+    dishes.forEach((dish, i) => {
+        if(!Number.isInteger(dish.quantity) || dish.quantity <= 0){
             next({
                 status: 400,
-                message: `dish ${dish.id} must have a quantity that is an integer greater than 0`
-            })
+                message: `Dish ${i} must have a quantity that is an integer greater than 0`,
+              })
         }
     })
+    next()
+}
+
+const validateDishIsAnArray = (req, res, next) => {
+    const { data: { dishes } = {} } = req.body;
+    if(Array.isArray(dishes) && dishes.length > 0){
+        next()
+    }else{
+        next({
+            status: 400,
+            message: "dishes must be an array"
+        })
+    }
+}
+
+const validateStatusforUpdate = (req, res, next) => {
+    const { orderId } = req.params;
+    const {order} = res.locals
+    const { data: { id, status } = {} } = req.body;
+
+    if (id && id !== orderId) {
+        next({
+            status: 400,
+            message: `Order id does not match route id. Order: ${id}, Route: ${orderId}`,
+        });
+    };
+
+    if(!status || !["pending", "preparing", "out-for-dellivery", "delivered"].includes(status)) {
+        next({
+            status: 400,
+            message: "Order must have a status of pending, preparing,out-for-delivery, delivered",
+        })
+    };
+
+    if(order.status === "delivered"){
+        next({
+            status: 400,
+            message: "A delivered order cannot be changed",
+        })
+    };
+      
+    next();
 }
 
 const create = (req, res, next) => {
     const newId = nextId()
-    const {deliverTo, mobileNumber, status, dishes} = req.body.data
+    const { deliverTo, mobileNumber, dishes } = req.body.data
 
     let newOrder = {
         id: newId,
         deliverTo: deliverTo,
         mobileNumber: mobileNumber,
-        status: status,
         dishes: dishes
     }
 
@@ -68,14 +107,15 @@ const create = (req, res, next) => {
 }
 
 const update = (req, res, next) => {
-    const {deliverTo, mobileNumber, status, dishes} = req.body.data
+    const {deliverTo, mobileNumber, status, dishes, quantity} = req.body.data
     const {index, order} = res.locals
     const updatedOrder = {
         ...order,
         deliverTo,
         mobileNumber,
         status,
-        dishes
+        dishes,
+        quantity
     }
     orders[index] = updatedOrder
     res.send({ data: updatedOrder })
@@ -109,8 +149,8 @@ module.exports = {
     create: [
         validator("deliverTo"), 
         validator("mobileNumber"),
-        validator("status"),
         validator("dishes"),
+        validateDishIsAnArray,
         validateDishQuantityIsAnInteger,
         create
     ],
@@ -120,6 +160,8 @@ module.exports = {
         validator("mobileNumber"),
         validator("status"),
         validator("dishes"),
+        validateStatusforUpdate,
+        validateDishIsAnArray,
         validateDishQuantityIsAnInteger,
         update
     ],
